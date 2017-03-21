@@ -1,0 +1,61 @@
+#! /bin/sh
+#chkconfig:50000 50001
+#
+#run_nginx_only  for nginx on web server and proxy to the storage http
+#
+#processname: nginx_web
+#
+#description:nginx_web_auto_run
+#config: /etc/nginx_web/nginx.conf
+#program:/usr/local/nginx_web/sbin/nginx
+#status:/etc/inid.d/nginx_web status
+
+NGINX_LOG=/etc/nginx_web/nginx.log
+NGINX_CONF=/etc/nginx_web/nginx.conf
+
+case "$1" in
+start)
+	if [ -f $NGINX_CONF ]
+	then
+		NGINX=/usr/local/nginx_web/sbin/nginx
+		sudo echo "`date +%Y-%m-%d\ %T`:starting the nginx of web"
+		sudo "$NGINX" -c "$NGINX_CONF" &
+		if [ $? -ne 0 ];then
+			sudo echo "`date +%Y-%m-%d\ %T`:nginx start error: $?" >> $NGINX_LOG
+		fi	
+		sudo echo "`date +%Y-%m-%d\ %T`:nginx start success" >> $NGINX_LOG
+	else 
+		sudo echo "`date +%Y-%m-%d\ %T`:$NGINX_CONF not found" >> $NGINX_LOG
+	fi
+	#nginx auto start sh end #####################################################
+
+	#start the python cgi
+	PID=$(ps -ef |grep ncgi | grep -v grep | awk '{print($2)}'  | xargs)
+	if [ -n "$PID" ];then
+		sudo kill -9 $PID
+	fi
+
+	sudo python /etc/nginx_web/ncgi.py  &
+	if [ $? -ne 0 ];then
+		sudo echo "`date +%Y-%m-%d\ %T`:Python FastCGI start fail:$?" >> $NGINX_LOG
+	else sudo echo "`date +%Y-%m-%d\ %T`:Python FastCGI start success" >> $NGINX_LOG
+	fi
+	;;
+stop)
+	PID=$(ps -ef |grep nginx_web | grep -v grep | awk '{print($2)}'  | xargs)
+	if [ -n "$PID" ];then
+		sudo kill $PID
+	fi
+	;;
+restart)
+	$0 stop || true
+	$0 start
+	;;
+*)
+	echo "use the command start|stop|restart"
+	exit 1
+	;;
+esac
+
+
+

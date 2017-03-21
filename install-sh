@@ -1,0 +1,182 @@
+#! /bin/sh
+
+LOG="install.log"
+
+
+##############################################################
+# Step0 GET THE OS SYSTEM                             
+##############################################################
+
+# Get current path and the login user
+CUR_PATH=$(pwd)
+
+# Get the linux info
+# Distributor ID: SUSE LINUX
+LINUX_DISTRIBUTOR=$(lsb_release -a | grep Distributor)
+# SUSE=$(echo $LINUX_DISTRIBUTOR | grep 'SUSE')
+if [[ ! "$LINUX_DISTRIBUTOR" =~ 'SUSE' ]];then
+	echo "`date +%Y-%m-%d\ %T`:do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:the os is suse, continue install" >> $LOG
+fi
+
+
+# Check the nginx
+search=$(ls /usr/local/ | grep nginx_web)
+if [ -n "$search" ]; then
+	echo "`date +%Y-%m-%d\ %T`:the nginx has been installed, if you want to continue, please input c" >> $LOG
+	read -p "input any key to continue, type ctrl+c to quit" continue
+	echo "`date +%Y-%m-%d\ %T`:input is:$continue" >> $LOG
+fi
+
+
+#杀死进程
+sudo chmod +x ./conf/nginx_web/nginx_web
+sudo ./conf/nginx_web/nginx_web stop
+
+
+##############################################################
+# Step1 Check the python and gcc-c++ env, you can skip the step                           
+##############################################################
+# check and install python-devel
+search=$(rpm -q python-devel | grep  -v "not installed")
+plugins=""
+if [ ! -n "$search" ];then
+	sudo zypper in python-devel
+	if [ $? -ne 0 ];then
+		echo "`date +%Y-%m-%d\ %T`:install python-devel fail:$?" >> $LOG
+		exit 1
+	else echo "`date +%Y-%m-%d\ %T`:install python-devel sucess" >> $LOG
+	fi
+else echo "`date +%Y-%m-%d\ %T`:python-devel has been installed" >> $LOG
+fi
+
+# check and install python-tk
+search=$(rpm -q python-tk | grep  -v "not installed")
+if [ ! -n "$search" ];then
+	sudo zypper in python-tk
+	if [ $? -ne 0 ];then
+		echo "`date +%Y-%m-%d\ %T`:install python-tk fail:$?" >> $LOG
+		exit 1
+	else echo "`date +%Y-%m-%d\ %T`:install python-tk sucess" >> $LOG
+	fi
+else echo "`date +%Y-%m-%d\ %T`:python-tk has been installed" >> $LOG
+fi
+
+
+# check and install gcc
+search=$(rpm -q gcc | grep  -v "not installed")
+if [ ! -n "$search" ];then
+	sudo zypper in gcc
+	if [ $? -ne 0 ];then
+		echo "`date +%Y-%m-%d\ %T`:install gcc fail:$?" >> $LOG
+		exit 1
+	else echo "`date +%Y-%m-%d\ %T`:install gcc sucess" >> $LOG
+	fi
+else echo "`date +%Y-%m-%d\ %T`:gcc has been installed" >> $LOG
+fi
+
+
+# check and install gcc-c++
+search=$(rpm -q gcc-c++ | grep  -v "not installed")
+if [ ! -n "$search" ];then
+	sudo zypper in gcc-c++
+	if [ $? -ne 0 ];then
+		echo "`date +%Y-%m-%d\ %T`:install gcc-c++ fail:$?" >> $LOG
+		exit 1
+	else echo "`date +%Y-%m-%d\ %T`:install gcc-c++ sucess" >> $LOG
+	fi
+else echo "`date +%Y-%m-%d\ %T`:gcc-c++ has been installed" >> $LOG
+fi
+
+
+# install the fastcgi lib of python
+sudo pip install Cython-0.24.1-cp27-cp27mu-manylinux1_x86_64.whl
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:install Cython fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:install Cython sucess" >> $LOG
+fi
+
+sudo pip install flup-1.0.tar.gz
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:install flup fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:install flup sucess" >> $LOG
+fi
+
+sudo pip install pycrypto-2.6.1.tar.gz
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:install pycrypto fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:install pycrypto sucess" >> $LOG
+fi
+
+##############################################################
+# Step2 install the nginx                           
+##############################################################
+
+# create the web user for nginx
+echo "`date +%Y-%m-%d\ %T`:create the web user for nginx" >> $LOG
+sudo groupadd www
+sudo useradd -g www www
+
+
+# install_start "nginx-1.6.3"
+# 解压依赖包，不安装，nginx编译的时候直接编译进去，简化安装步骤
+echo "`date +%Y-%m-%d\ %T`:tar pcre..." >> $LOG
+tar xvzf pcre-8.38.tar.gz
+PCRE="$CUR_PATH""/pcre-8.38"
+
+
+echo "`date +%Y-%m-%d\ %T`:tar zlib..." >> $LOG
+tar xvzf zlib-1.2.8.tar.gz
+ZLIB="$CUR_PATH""/zlib-1.2.8"
+
+echo "`date +%Y-%m-%d\ %T`:tar openssl..." >> $LOG
+tar xvzf openssl-1.0.1u.tar.gz
+OPEN_SSL="$CUR_PATH""/openssl-1.0.1u"
+
+echo "`date +%Y-%m-%d\ %T`:tar nginx..." >> $LOG
+tar xvzf nginx-1.6.3.tar.gz
+cd nginx-1.6.3
+echo "`date +%Y-%m-%d\ %T`:config nginx intall params" >> $LOG
+
+chmod +x *
+sudo ./configure --user=www --group=www --prefix=/usr/local/nginx_web  --with-http_stub_status_module --with-http_auth_request_module --with-http_ssl_module --with-openssl=$OPEN_SSL --with-pcre=$PCRE --with-zlib=$ZLIB
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:config nginx fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:config nginx success" >> $LOG
+fi
+
+sudo make
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:build nginx fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:make nginx success" >> $LOG
+fi
+
+sudo make install
+if [ $? -ne 0 ];then
+	echo "`date +%Y-%m-%d\ %T`:install nginx fail:$?" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:install nginx success" >> $LOG
+fi
+cd ..
+
+##############################################################
+# Step4 CALL THE RECONFIG CODE                          
+##############################################################
+chmod +x reconfig-sh
+./reconfig-sh
+
+
+echo "`date +%Y-%m-%d\ %T`:clear the temp files" >> $LOG
+sudo rm -rf zlib-1.2.8
+sudo rm -rf pcre-8.38
+sudo rm -rf openssl-1.0.1u
+sudo rm -rf nginx-1.6.3
+
+
+echo "`date +%Y-%m-%d\ %T`:install the fdfs and nginx success!" >> $LOG

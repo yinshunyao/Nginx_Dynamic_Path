@@ -1,0 +1,95 @@
+#! /bin/sh
+# Copyright (C) 2017 CETC
+# Author: yinshunyao@qq.com, 2017
+#
+# reconfig the fastdfs system after the server has been installed
+# 
+#
+
+LOG="install.log"
+
+# kill the running server proccess and clear the histry log
+# use the setup file stop sh
+sudo chmod +x ./conf/nginx_web/nginx_web
+sudo ./conf/nginx_web/nginx_web stop
+
+##############################################################
+# Step0 GET THE OS SYSTEM                             
+##############################################################
+#
+# Get the current path and current login user
+CUR_PATH=$(pwd)
+
+# Get the linux info
+#Distributor ID: SUSE LINUX
+LINUX_DISTRIBUTOR=$(lsb_release -a | grep Distributor)
+if [[ ! $LINUX_DISTRIBUTOR =~ 'SUSE' ]];then
+	echo "`date +%Y-%m-%d\ %T`:do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
+	exit 1
+else echo "`date +%Y-%m-%d\ %T`:the os is suse, continue install" >> $LOG
+fi
+
+##############################################################
+# Step1 CONFIG FOR NGINX                           
+##############################################################
+# delete the old config
+NGINX_CONF=/etc/nginx_web
+NGINX_PROG=/usr/local/nginx_web
+sudo rm -rf $NGINX_CONF
+sudo mkdir $NGINX_CONF
+# copy the resouce file for nginx
+sudo cp -r resouce/nginx/* "$NGINX_PROG""/html/"
+# copy the setup file for nginx
+sudo cp -r conf/nginx_web/* $NGINX_CONF
+
+# excutable the sh
+sudo chmod +x "$NGINX_CONF""/nginx_web"
+sudo chmod +wr "$NGINX_CONF""/nginx.log"
+
+# set the ip of listen for nginx, listen the all ip of server
+LOCAL_IP_LIST=$(sudo ifconfig | grep 'inet addr:' | awk '{print $2}' | tr -d "addr:"  | xargs)
+sudo sed -i "s/192.168.254.132/$LOCAL_IP_LIST/g" `find /etc/nginx_web/ -name 'nginx.conf'`
+
+
+# set the port of storage, the default port is 8999
+# the port will been used in python fastCGI, config in ncgi.ini
+# the port is same with the storage nginx port
+#read -p "please input the storage port,default port is 8999:" port
+#if [ ! -n "$port" ];then
+#	echo 'the default port 8999 will be used'
+#else
+#	sudo sed -i "s/8999/$port/g" `find /etc/nginx_web/ -name 'ncgi.ini'`
+#fi
+#echo "install nginx success" >> $LOG
+
+
+##############################################################
+# Step3 AUTO RUN CONFIG                         
+##############################################################
+# 不使用after.local配置，创建服务
+# add the run.sh to the init config in OS
+# INIT_FILE=/etc/init.d/after.local
+# if fdfs has been installed in the server, the nginx has been run for fdfs storage
+# num=$(sudo cat /etc/init.d/after.local  | grep '/etc/nginx_web/run_nginx_only.sh' | wc -l)
+# if [ $num -eq 0 ];then
+#	echo "will add run_nginx_only.sh to after.local" >> $LOG
+#	sudo cp -f /etc/init.d/after.local /etc/init.d/after.local.bak.for.nginx
+#	sudo sh -c 'echo "sudo /etc/nginx_web/run_nginx_only.sh &" >> /etc/init.d/after.local'	
+#	sudo sh -c 'chmod +x /etc/init.d/after.local'
+#else
+#	echo "auto run config is ok" >> $LOG
+#fi
+#echo 'config nginx success!' >> $LOG
+sudo chmod +x /etc/nginx_web/nginx_web
+sudo cp /etc/nginx_web/nginx_web  /etc/init.d/
+sudo chkconfig --add nginx_web
+sudo chkconfig --level 012345 nginx_web on
+echo "`date +%Y-%m-%d\ %T`:auto run success" >> $LOG
+
+##############################################################
+# Step5 RUN                    
+##############################################################
+# 启动程序
+sudo /etc/nginx_web/nginx_web start
+echo '`date +%Y-%m-%d\ %T`:start nginx success!' >> $LOG
+

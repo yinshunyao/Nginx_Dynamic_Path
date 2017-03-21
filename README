@@ -1,0 +1,17 @@
+1、上传文件和安装采用相同的用户账号，确保文件权限一致；
+
+2、确保install-sh脚本具有执行权限 chmod +x install-sh
+
+3、安装过程中需要保持网络通畅，有些软件包可能需要在线下载，需要输入yes确认；
+
+4、如果安装时间过长，可能需要输入sudo root密码继续安装；安装过程中会有提示
+
+5、安装过程日志可以参见同目录下install.log文件
+
+6、nginx的location解析的魔鬼数字需要调用python后台程序生成，本地会启用Python FastCGI动态解析地址
+
+7、Ningx使用到的端口50000；Python FastCGI启用端口50001
+
+8、注册的服务器名为nginx_web，可以手工关闭服务chkconfig --del nginx_web
+
+9、启动日志参见 /etc/nginx_web/nginx.log； nginx 运行日志参见/usr/local/nginx/logs目录下文件
